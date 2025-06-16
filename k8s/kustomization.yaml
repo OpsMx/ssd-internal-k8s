@@ -1,0 +1,44 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- artifact-scan.yaml
+- mobsf
+- supplychain-api.yaml
+- supplychain-preprocessor.yaml
+- ssd-rescheduler.yaml
+- source-scan.yaml
+- ssd-gate
+- ssd-ui
+- project-monitor.yaml
+- ssd-opa.yaml
+- token-machine.yaml
+- tool-chain.yaml
+- zap.yaml
+
+images:
+- name: opsmx11/artifact-scan
+  newTag: 23f8c44-120
+- name: opsmx11/mobsf
+  newTag: v4.1.3
+- name: opsmx11/supplychain-api
+  newTag: eb97688-8
+- name: opsmx11/supplychain-preprocessor
+  newTag: ff84d74-98
+- name: genos1998/ssd-rescheduler
+  newTag: v2025.06.13.0018
+- name: opsmx11/source-scan
+  newTag: 931a92d-33  
+- name: opsmx11/ssd-gate
+  newTag: e3acfc6-106
+- name: opsmx11/ssd-ui
+  newTag: 1af1f39b6-861
+- name: opsmx11/project-monitor
+  newTag: 4d80376-23
+- name: opsmx11/ssd-opa
+  newTag: a04a5c6-793
+- name: opsmx11/token-machine
+  newTag: 99eb752-36
+- name: opsmx11/tool-chain
+  newTag: 300bf48-843
+- name: opsmx11/zap
+  newTag: 2024-12-00

@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: minio
+    app.kubernetes.io/managed-by: Helm
+    chart: minio-8.0.9
+    heritage: Helm
+    release: ssd
+  name: ssd-minio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+      release: ssd
+  strategy:
+    rollingUpdate:
+      maxSurge: 100%
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        checksum/config: 3d509542dc66aae8215d93560f6d31b849a5701681756b885c42cc41ca370fa0
+        checksum/secrets: ac634b412609e7bbb639c4cc8eb4fac14273a30201a9ebf22b80aaa350b951f6
+      creationTimestamp: null
+      labels:
+        app: minio
+        release: ssd
+      name: ssd-minio
+    spec:
+      containers:
+      - command:
+        - /bin/sh
+        - -ce
+        - /usr/bin/docker-entrypoint.sh minio -S /etc/minio/certs/ server /export
+        env:
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              key: accesskey
+              name: ssd-minio
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              key: secretkey
+              name: ssd-minio
+        image: quay.io/opsmxpublic/minio:RELEASE.2020-12-03T05-49-24Z
+        imagePullPolicy: IfNotPresent
+        name: minio
+        ports:
+        - containerPort: 9000
+          name: http
+          protocol: TCP
+        resources:
+          requests:
+            memory: 4Gi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /export
+          name: export
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsUser: 1000
+      serviceAccount: ssd-minio
+      serviceAccountName: ssd-minio
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: export
+        persistentVolumeClaim:
+          claimName: ssd-minio
+      - name: minio-user
+        secret:
+          defaultMode: 420
+          secretName: ssd-minio

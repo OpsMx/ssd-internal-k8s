@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ssd
+    app.kubernetes.io/managed-by: Helm
+    chart: ssd-2025.02.00
+    component: ui
+    heritage: Helm
+    release: ssd
+  name: ssd-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ssd
+      component: ui
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        checksum/configmap: fff67f44e16303145675ec1338cb9b526b2fb63fa14c4b1f94e0c08851914de9
+      creationTimestamp: null
+      labels:
+        app: ssd
+        component: ui
+    spec:
+      containers:
+      - envFrom:
+        - configMapRef:
+            name: ssd-proxy-certs
+            optional: true
+        image: opsmx11/ssd-ui:1af1f39b6-861
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /ui/indexl.html
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: ssd-ui
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          successThreshold: 1
+          tcpSocket:
+            port: 8080
+          timeoutSeconds: 1
+        resources: {}
+        securityContext:
+          allowPrivilegeEscalation: false
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /var/www/html/ui/assets/config/app-config.json
+          name: config-dir
+          subPath: app-config.json
+        - mountPath: /var/www/html/ui/assets/config/help-text.json
+          name: config-dir
+          subPath: help-text.json
+        - mountPath: /var/www/html/ui/assets/config/integrators-config.json
+          name: config-dir
+          subPath: integrators-config.json
+        - mountPath: /var/www/html/ui/assets/config/insights-config.json
+          name: config-dir
+          subPath: insights-config.json
+        - mountPath: /etc/nginx/nginx.conf
+          name: nginx-config
+          subPath: nginx.conf
+        - mountPath: /usr/local/share/ca-certificates
+          name: custom-certs
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: ssd-ui-config
+        name: config-dir
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: customer-custon-ca
+          optional: true
+        name: custom-certs
+      - configMap:
+          defaultMode: 420
+          name: ssd-ui-nginxconf
+        name: nginx-config
+      - configMap:
+          defaultMode: 420
+          name: ssd-proxy-certs
+          optional: true
+        name: ssd-proxy-certs

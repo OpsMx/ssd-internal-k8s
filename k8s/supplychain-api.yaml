@@ -1,0 +1,182 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ssd
+    app.kubernetes.io/managed-by: Helm
+    chart: ssd-2025.02.00
+    component: supplychain-api
+    heritage: Helm
+    release: ssd
+  name: supplychain-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ssd
+      component: supplychain-api
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: ssd
+        chart: ssd-2025.02.00
+        component: supplychain-api
+        heritage: Helm
+        release: ssd
+    spec:
+      containers:
+      - env:
+        - name: S3_ENDPOINT_URL
+          value: http://ssd-minio:9000/
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              key: accesskey
+              name: ssd-minio
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              key: secretkey
+              name: ssd-minio
+        - name: Cypher_Key
+          valueFrom:
+            secretKeyRef:
+              key: AESEncryptionKey
+              name: ssdsecret
+        envFrom:
+        - configMapRef:
+            name: ssd-proxy-certs
+            optional: true
+        image: opsmx11/supplychain-api:eb97688-8
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: 8099
+            scheme: HTTP
+          periodSeconds: 20
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: supplychain-api
+        ports:
+        - containerPort: 8099
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 12
+          httpGet:
+            path: /healthz
+            port: 8099
+            scheme: HTTP
+          periodSeconds: 20
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources: {}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: false
+          runAsGroup: 1000
+          runAsNonRoot: false
+          runAsUser: 1000
+          seccompProfile:
+            type: RuntimeDefault
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /app/ssd-public-keys
+          name: ssd-public-keys
+        - mountPath: /app/app-config.yaml
+          name: supplychain-api-volume
+          subPath: app-config.yaml
+        - mountPath: /app/ssd-integrations.yaml
+          name: supplychain-api-cm
+          subPath: ssd-integrations.yaml
+        - mountPath: /app/secrets/
+          name: ssdsecret
+          readOnly: true
+        - mountPath: /usr/local/share/ca-certificates
+          name: custom-certs
+        - mountPath: /app/secrets/supplychain-api-token/
+          name: token
+          readOnly: true
+        - mountPath: /app/zapOpenApiSpec
+          name: zap-openapi-spec
+        - mountPath: /app/policy
+          name: policy
+      dnsPolicy: ClusterFirst
+      initContainers:
+      - command:
+        - sh
+        - -c
+        - |
+          echo 'Waiting for RABBITMQ-SERVICE to become ready...'
+          until printf "." && nc -z -w 2 rabbitmq-service 5672; do
+             sleep 2;
+          done;
+          echo 'RABBITMQ-SERVICE OK ✓'
+        image: quay.io/opsmxpublic/pgchecker:v1
+        imagePullPolicy: IfNotPresent
+        name: rabbitmq-check
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - emptyDir: {}
+        name: zap-openapi-spec
+      - emptyDir: {}
+        name: policy
+      - configMap:
+          defaultMode: 420
+          name: ssd-public-keys
+        name: ssd-public-keys
+      - name: supplychain-api-volume
+        secret:
+          defaultMode: 420
+          items:
+          - key: app-config.yaml
+            path: app-config.yaml
+          secretName: supplychain-api
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: ssd-integrations.yaml
+            path: ssd-integrations.yaml
+          name: supplychain-api-cm
+        name: supplychain-api-cm
+      - name: ssdsecret
+        secret:
+          defaultMode: 420
+          items:
+          - key: AESEncryptionKey
+            path: ssdsecret/AESEncryptionKey
+          secretName: ssdsecret
+      - configMap:
+          defaultMode: 420
+          name: ssd-proxy-certs
+          optional: true
+        name: ssd-proxy-certs
+      - name: token
+        secret:
+          defaultMode: 420
+          secretName: supplychain-api-token
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: customer-custon-ca
+          optional: true
+        name: custom-certs

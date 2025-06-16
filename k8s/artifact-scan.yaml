@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ssd
+    app.kubernetes.io/managed-by: Helm
+    chart: ssd-2025.02.00
+    component: artifact-scan
+    heritage: Helm
+    release: ssd
+  name: artifact-scan
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ssd
+      component: artifact-scan
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: ssd
+        component: artifact-scan
+    spec:
+      containers:
+      - image: opsmx11/artifact-scan:23f8c44-120
+        imagePullPolicy: IfNotPresent
+        name: artifact-scan
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /app/ssd-public-keys
+          name: ssd-public-keys
+        - mountPath: /app/secrets/
+          name: ssdsecret
+          readOnly: true
+        - mountPath: /app/scanResult
+          name: scanresult
+        - mountPath: /app/config/artifact-scan.yaml
+          name: artifact-scan
+          subPath: artifact-scan.yaml
+        - mountPath: /usr/local/share/ca-certificates
+          name: custom-certs
+        - mountPath: /app/secrets/artifact-scan-token
+          name: token
+          readOnly: true
+        - mountPath: /app/temp
+          name: tempdir
+        - mountPath: /app/app-config.yaml
+          name: project-monitor-queue
+          subPath: app-config.yaml
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: ssdsecret
+        secret:
+          defaultMode: 420
+          items:
+          - key: AESEncryptionKey
+            path: ssdsecret/AESEncryptionKey
+          secretName: ssdsecret
+      - configMap:
+          defaultMode: 420
+          name: ssd-proxy-certs
+          optional: true
+        name: ssd-proxy-certs
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: customer-custon-ca
+          optional: true
+        name: custom-certs
+      - configMap:
+          defaultMode: 420
+          name: ssd-public-keys
+        name: ssd-public-keys
+      - name: token
+        secret:
+          defaultMode: 420
+          optional: true
+          secretName: artifact-scan-token
+      - emptyDir: {}
+        name: scanresult
+      - emptyDir: {}
+        name: tempdir
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: artifact-scan.yaml
+            path: artifact-scan.yaml
+          name: artifact-scan-config
+        name: artifact-scan
+      - name: project-monitor-queue
+        secret:
+          defaultMode: 420
+          items:
+          - key: app-config.yaml
+            path: app-config.yaml
+          secretName: project-monitor

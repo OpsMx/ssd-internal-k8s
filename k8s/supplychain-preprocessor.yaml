@@ -1,0 +1,148 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ssd
+    app.kubernetes.io/managed-by: Helm
+    chart: ssd-2025.02.00
+    component: supplychain-preprocessor
+    heritage: Helm
+    release: ssd
+  name: supplychain-preprocessor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ssd
+      component: supplychain-preprocessor
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: ssd
+        chart: ssd-2025.02.00
+        component: supplychain-preprocessor
+        heritage: Helm
+        release: ssd
+    spec:
+      containers:
+      - envFrom:
+        - configMapRef:
+            name: ssd-proxy-certs
+            optional: true
+        image: opsmx11/supplychain-preprocessor:ff84d74-98
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: 8058
+            scheme: HTTP
+          periodSeconds: 20
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: supplychain-preprocessor
+        readinessProbe:
+          failureThreshold: 6
+          httpGet:
+            path: /healthz
+            port: 8058
+            scheme: HTTP
+          periodSeconds: 20
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources: {}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsGroup: 1000
+          runAsNonRoot: true
+          runAsUser: 1000
+          seccompProfile:
+            type: RuntimeDefault
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /etc/ssd-public-keys
+          name: ssd-public-keys
+        - mountPath: /tmp
+          name: tmp
+        - mountPath: /etc/config
+          name: preprocessor-volume
+        - mountPath: /etc/secrets/
+          name: ssdsecret
+          readOnly: true
+        - mountPath: /etc/secrets/supplychain-preprocessor-token/
+          name: token
+          readOnly: true
+        - mountPath: /usr/local/share/ca-certificates
+          name: custom-certs
+        - mountPath: /app/scanResult
+          name: scanresult
+        - mountPath: /app/grypeDB
+          name: grypedb
+      dnsPolicy: ClusterFirst
+      initContainers:
+      - command:
+        - sh
+        - -c
+        - |
+          echo 'Waiting for RABBITMQ-SERVICE to become ready...'
+          until printf "." && nc -z -w 2 rabbitmq-service 5672; do
+             sleep 2;
+          done;
+          echo 'RABBITMQ-SERVICE OK ✓'
+        image: quay.io/opsmxpublic/pgchecker:v1
+        imagePullPolicy: IfNotPresent
+        name: rabbitmq-check
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: ssd-public-keys
+        name: ssd-public-keys
+      - emptyDir: {}
+        name: tmp
+      - emptyDir: {}
+        name: scanresult
+      - emptyDir: {}
+        name: grypedb
+      - name: preprocessor-volume
+        secret:
+          defaultMode: 420
+          secretName: supplychain-preprocessor
+      - name: ssdsecret
+        secret:
+          defaultMode: 420
+          items:
+          - key: AESEncryptionKey
+            path: ssdsecret/AESEncryptionKey
+          secretName: ssdsecret
+      - configMap:
+          defaultMode: 420
+          name: ssd-proxy-certs
+          optional: true
+        name: ssd-proxy-certs
+      - name: token
+        secret:
+          defaultMode: 420
+          secretName: supplychain-preprocessor-token
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: customer-custon-ca
+          optional: true
+        name: custom-certs

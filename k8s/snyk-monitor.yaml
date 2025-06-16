@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ssd
+    app.kubernetes.io/managed-by: Helm
+    chart: ssd-2025.02.00
+    component: snyk-monitor
+    heritage: Helm
+    release: ssd
+  name: snyk-monitor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ssd
+      component: snyk-monitor
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: ssd
+        chart: ssd-2025.02.00
+        component: snyk-monitor
+        heritage: Helm
+        release: ssd
+    spec:
+      containers:
+      - args:
+        - --config=/etc/otel/otel-sidecar-config.yaml
+        image: otel/opentelemetry-collector-contrib:latest
+        imagePullPolicy: Always
+        name: otel-sidecar
+        resources: {}
+        securityContext: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /etc/otel
+          name: otel-sidecar-volume
+      - image: opsmx11/snyk-monitor:e89fbfb-2
+        imagePullPolicy: IfNotPresent
+        name: snyk-monitor
+        resources: {}
+        securityContext: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /etc/ssd-public-keys
+          name: ssd-public-keys
+        - mountPath: /etc/secrets
+          name: ssdsecret
+          readOnly: true
+        - mountPath: /etc/config
+          name: cli-config
+        - mountPath: /etc/secrets/dgraph-secret
+          name: snyk-monitor-secret
+          readOnly: true
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: otel-sidecar-config
+        name: otel-sidecar-volume
+      - configMap:
+          defaultMode: 420
+          name: ssd-public-keys
+        name: ssd-public-keys
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: config.yaml
+            path: config.yaml
+          name: snyk-monitor-config
+        name: cli-config
+      - name: ssdsecret
+        secret:
+          defaultMode: 420
+          items:
+          - key: AESEncryptionKey
+            path: ssdsecret/AESEncryptionKey
+          secretName: ssdsecret
+      - name: snyk-monitor-secret
+        secret:
+          defaultMode: 420
+          secretName: snyk-monitor-secret

@@ -1,0 +1,179 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ssd
+    app.kubernetes.io/managed-by: Helm
+    chart: ssd-2025.02.00
+    component: gate
+    heritage: Helm
+    release: ssd
+  name: ssd-gate
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ssd
+      component: gate
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: ssd
+        component: gate
+    spec:
+      containers:
+      - args:
+        - /app/ssdgate
+        - -configFile=/app/config/ssd-gate-config.yaml
+        - -unsafe=false
+        envFrom:
+        - configMapRef:
+            name: ssd-proxy-certs
+            optional: true
+        - secretRef:
+            name: ssd-initial-password
+            optional: true
+        image: opsmx11/ssd-gate:e3acfc6-106
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 6
+          httpGet:
+            path: /healthz
+            port: 8001
+            scheme: HTTP
+          periodSeconds: 20
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: ssd-gate
+        ports:
+        - containerPort: 8001
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 6
+          httpGet:
+            path: /healthz
+            port: 8001
+            scheme: HTTP
+          periodSeconds: 20
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources: {}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsGroup: 1000
+          runAsNonRoot: true
+          runAsUser: 1000
+          seccompProfile:
+            type: RuntimeDefault
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /app/config
+          name: config-home
+        - mountPath: /app/services
+          name: services-config
+        - mountPath: /app/saml
+          name: saml-files
+        - mountPath: /usr/local/share/ca-certificates
+          name: custom-certs
+        - mountPath: /app/internaltoken
+          name: ssd-gate-token
+        - mountPath: /app/publickeys
+          name: ssd-public-keys
+      dnsPolicy: ClusterFirst
+      initContainers:
+      - command:
+        - sh
+        - /tmp/decoder/secret-decoder.sh
+        - /tmp/config
+        - /app
+        image: opsmx11/k8s-decoder:hal
+        imagePullPolicy: IfNotPresent
+        name: replace-secrets
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /tmp/decoder
+          name: secret-decoder
+        - mountPath: /tmp/config
+          name: ssd-gate-config
+        - mountPath: /app/config
+          name: config-home
+        - mountPath: /app/publickeys
+          name: ssd-public-keys
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - emptyDir: {}
+        name: config-home
+      - configMap:
+          defaultMode: 420
+          name: ssd-gate-config
+          optional: true
+        name: ssd-gate-config
+      - configMap:
+          defaultMode: 420
+          name: services-config
+          optional: true
+        name: services-config
+      - name: ssd-gate-token
+        secret:
+          defaultMode: 420
+          secretName: ssd-gate-token
+      - configMap:
+          defaultMode: 420
+          name: ssd-public-keys
+        name: ssd-public-keys
+      - configMap:
+          defaultMode: 420
+          name: secret-decoder
+          optional: true
+        name: secret-decoder
+      - configMap:
+          defaultMode: 420
+          name: ssd-gate-templates
+          optional: true
+        name: ssd-gate-templates
+      - name: saml-files
+        secret:
+          defaultMode: 420
+          items:
+          - key: certificate.crt
+            path: certificate.crt
+          - key: certificate.crt
+            path: private.key
+          - key: metadata.xml
+            path: metadata.xml
+          optional: true
+          secretName: saml-files
+      - name: poc-passwords
+        secret:
+          defaultMode: 420
+          optional: true
+          secretName: ssd-initial-passwords
+      - configMap:
+          defaultMode: 420
+          name: ssd-proxy-certs
+          optional: true
+        name: ssd-proxy-certs
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: customer-custon-ca
+          optional: true
+        name: custom-certs

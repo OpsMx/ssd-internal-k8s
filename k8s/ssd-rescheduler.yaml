@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ssd
+    app.kubernetes.io/managed-by: Helm
+    chart: ssd-2025.02.00
+    component: ssd-rescheduler
+    heritage: Helm
+    release: ssd
+  name: ssd-rescheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ssd
+      component: ssd-rescheduler
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: ssd
+        chart: ssd-2025.02.00
+        component: ssd-rescheduler
+        heritage: Helm
+        release: ssd
+    spec:
+      containers:
+      - envFrom:
+        - configMapRef:
+            name: ssd-proxy-certs
+            optional: true
+        image: genos1998/ssd-rescheduler:v2025.06.13.0018
+        imagePullPolicy: IfNotPresent
+        name: ssd-rescheduler
+        resources: {}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsGroup: 1000
+          runAsNonRoot: true
+          runAsUser: 1000
+          seccompProfile:
+            type: RuntimeDefault
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /app/ssd-public-keys
+          name: ssd-public-keys
+        - mountPath: /usr/local/share/ca-certificates
+          name: custom-certs
+        - mountPath: /app/config/ssd-rescheduler.yaml
+          name: ssd-rescheduler-volume
+          subPath: ssd-rescheduler.yaml
+        - mountPath: /app/secrets/ssd-rescheduler-token/
+          name: token
+          readOnly: true
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: ssd-public-keys
+        name: ssd-public-keys
+      - name: token
+        secret:
+          defaultMode: 420
+          secretName: ssd-rescheduler-token
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: ssd-rescheduler.yaml
+            path: ssd-rescheduler.yaml
+          name: ssd-rescheduler-config
+        name: ssd-rescheduler-volume
+      - configMap:
+          defaultMode: 420
+          name: ssd-proxy-certs
+          optional: true
+        name: ssd-proxy-certs
+      - configMap:
+          defaultMode: 420
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: customer-custom-ca
+          optional: true
+        name: custom-certs

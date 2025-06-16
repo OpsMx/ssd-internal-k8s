@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ssd
+    app.kubernetes.io/managed-by: Helm
+    chart: ssd-2025.02.00
+    component: mobsf
+    heritage: Helm
+    release: ssd
+  name: mobsf
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ssd
+      component: mobsf
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: ssd
+        chart: ssd-2025.02.00
+        component: mobsf
+        heritage: Helm
+        release: ssd
+    spec:
+      containers:
+      - env:
+        - name: MOBSF_API_KEY
+          valueFrom:
+            secretKeyRef:
+              key: mobsfapikey
+              name: mobsf-secret
+        image: opsmx11/mobsf:v4.1.3
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          initialDelaySeconds: 150
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: 8000
+          timeoutSeconds: 1
+        name: mobsf
+        ports:
+        - containerPort: 8000
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          initialDelaySeconds: 150
+          periodSeconds: 10
+          successThreshold: 1
+          tcpSocket:
+            port: 8000
+          timeoutSeconds: 1
+        resources: {}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: false
+          runAsGroup: 1000
+          runAsNonRoot: false
+          runAsUser: 0
+          seccompProfile:
+            type: RuntimeDefault
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
